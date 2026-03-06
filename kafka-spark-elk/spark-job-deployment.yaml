@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-job
+  namespace: logging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-job
+  template:
+    metadata:
+      labels:
+        app: spark-job
+    spec:
+      containers:
+      - name: spark-job
+        image: spark:3.4.1
+        env:
+        - name: HOME
+          value: /tmp
+        command: ["/opt/spark/bin/spark-submit"]
+        args: [
+          "--conf", "spark.driver.extraJavaOptions=-Duser.home=/tmp",
+          "--conf", "spark.executor.extraJavaOptions=-Duser.home=/tmp",
+          "--master", "local[*]",
+          "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-30_2.12:8.12.2",
+          "/opt/spark-scripts/spark-job.py"
+        ]
+
+        volumeMounts:
+        - name: script-vol
+          mountPath: /opt/spark-scripts
+      volumes:
+      - name: script-vol
+        configMap:
+          name: spark-job-script

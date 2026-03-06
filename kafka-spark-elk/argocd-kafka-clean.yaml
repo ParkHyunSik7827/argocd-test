@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-standalone
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 22.1.0 # 구조가 단순한 이전 버전 사용하여 에러 최소화
+    chart: kafka
+    helm:
+      values: |
+        # Nginx와 섞이지 않도록 명시적 설정
+        image:
+          registry: docker.io
+          repository: bitnami/kafka
+          tag: 3.4.1-debian-11-r0
+        persistence:
+          enabled: false
+        zookeeper:
+          enabled: true # 이전 버전은 Zookeeper가 더 안정적임
+        replicaCount: 1
+        # 리소스 최소화 및 에러 유발 요소 제거
+        volumePermissions:
+          enabled: false
+        metrics:
+          kafka:
+            enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

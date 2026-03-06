@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-gitops
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 32.4.3
+    chart: kafka
+    helm:
+      values: |
+        global:
+          security:
+            allowInsecureImages: true
+        image:
+          registry: docker.io
+          repository: apache/kafka
+          tag: latest
+        persistence:
+          enabled: false
+        zookeeper:
+          enabled: false
+        kraft:
+          enabled: true
+        replicaCount: 1
+        sasl:
+          enabled: false
+        listeners:
+          client:
+            protocol: PLAINTEXT
+          interbroker:
+            protocol: PLAINTEXT
+          controller:
+            protocol: PLAINTEXT
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

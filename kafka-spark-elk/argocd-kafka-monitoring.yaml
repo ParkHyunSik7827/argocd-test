@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-monitoring-only
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phs7827/argocd-test.git
+    targetRevision: HEAD
+    path: non-existent-path # 존재하지 않는 경로를 바라보게 하여 Git 내용(Nginx)을 무시함
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated: null # 자동 동기화 차단

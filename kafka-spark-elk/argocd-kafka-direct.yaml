@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-gitops-direct
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phs7827/argocd-test.git
+    targetRevision: HEAD
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: false # 기존 Kafka 유지를 위해 false
+      selfHeal: true

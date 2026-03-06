@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-pipeline
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/phs7827/argocd-test.git
+    targetRevision: HEAD
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      prune: false # 기존 수동 생성 리소스 유지를 위해 잠시 꺼둠
+      selfHeal: true
