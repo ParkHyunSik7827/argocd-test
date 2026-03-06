@@ -1,4 +1,4 @@
-# Kafka (zookeeper-less) - 동일 유지
+# Kafka (StatefulSet 업그레이드)
 apiVersion: v1
 kind: Service
 metadata:
@@ -11,11 +11,13 @@ spec:
     app: kafka
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: kafka
   namespace: default
 spec:
+  serviceName: "kafka"
+  replicas: 1
   selector:
     matchLabels:
       app: kafka
@@ -47,9 +49,20 @@ spec:
         - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
           value: "1"
         - name: KAFKA_LOG_DIRS
-          value: "/tmp/kafka-logs"
+          value: "/var/lib/kafka/data"
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /var/lib/kafka/data
+  volumeClaimTemplates:
+  - metadata:
+      name: kafka-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
 ---
-# Elasticsearch (StatefulSet 업그레이드)
+# Elasticsearch (동일 유지)
 apiVersion: v1
 kind: Service
 metadata:
@@ -97,7 +110,7 @@ spec:
         requests:
           storage: 5Gi
 ---
-# Grafana - 동일 유지
+# Grafana (동일 유지)
 apiVersion: v1
 kind: Service
 metadata:
