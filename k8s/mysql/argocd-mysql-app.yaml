@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/phs7827/argocd-test
+    repoURL: https://github.com/ParkHyunSik7827/argocd-test
     targetRevision: HEAD
     path: k8s/mysql
   destination:
