@@ -15,12 +15,26 @@ spec:
     spec:
       containers:
       - name: spark
-        image: bitnami/spark:3.4.1
-        command: ["/opt/bitnami/spark/bin/spark-submit"]
+        image: apache/spark:3.5.0
+        command: ["/opt/spark/bin/spark-submit"]
         args: [
-          "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.1,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.3",
+          "--driver-memory", "1G",
+          "--conf", "spark.jars.ivy=/tmp/.ivy2",
+          "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.3",
           "/opt/spark-job/spark-process.py"
         ]
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        env:
+        - name: SPARK_USER
+          value: "spark"
+        - name: HOME
+          value: "/tmp"
         volumeMounts:
         - name: spark-job-code
           mountPath: /opt/spark-job
@@ -28,29 +42,3 @@ spec:
       - name: spark-job-code
         configMap:
           name: spark-job-config
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: spark-job-config
-  namespace: default
-data:
-  spark-process.py: |
-    from pyspark.sql import SparkSession
-    from pyspark.sql.functions import from_json, col
-    from pyspark.sql.types import StructType, StringType
-
-    KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
-    KAFKA_TOPIC = "user_logs"
-    ES_NODES = "elasticsearch"
-    ES_PORT = "9200"
-    ES_INDEX = "processed_logs"
-
-    spark = SparkSession.builder.appName("KafkaToES").getOrCreate()
-
-    df = spark.readStream.format("kafka").option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS).option("subscribe", KAFKA_TOPIC).load()
-    schema = StructType().add("user_id", StringType()).add("action", StringType()).add("timestamp", StringType())
-    parsed_df = df.selectExpr("CAST(value AS STRING)").select(from_json(col("value"), schema).alias("data")).select("data.*")
-    
-    query = parsed_df.writeStream.format("org.elasticsearch.spark.sql").option("es.nodes", ES_NODES).option("es.port", ES_PORT).option("es.resource", ES_INDEX).option("checkpointLocation", "/tmp/spark-checkpoint").start()
-    query.awaitTermination()
