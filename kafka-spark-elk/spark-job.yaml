@@ -18,18 +18,18 @@ spec:
         image: apache/spark:3.5.0
         command: ["/opt/spark/bin/spark-submit"]
         args: [
-          "--driver-memory", "1G",
+          "--driver-memory", "1500M",
           "--conf", "spark.jars.ivy=/tmp/.ivy2",
           "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.elasticsearch:elasticsearch-spark-30_2.12:7.17.3",
           "/opt/spark-job/spark-process.py"
         ]
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "500m"
-          limits:
             memory: "2Gi"
             cpu: "1"
+          limits:
+            memory: "3Gi"
+            cpu: "2"
         env:
         - name: SPARK_USER
           value: "spark"
@@ -53,18 +53,49 @@ data:
     from pyspark.sql import SparkSession
     from pyspark.sql.functions import from_json, col
     from pyspark.sql.types import StructType, StringType
+    import sys
 
-    KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
-    KAFKA_TOPIC = "user_logs"
-    ES_NODES = "elasticsearch"
-    ES_PORT = "9200"
-    ES_INDEX = "processed_logs"
-
-    spark = SparkSession.builder.appName("KafkaToES").getOrCreate()
-
-    df = spark.readStream.format("kafka").option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS).option("subscribe", KAFKA_TOPIC).load()
-    schema = StructType().add("user_id", StringType()).add("action", StringType()).add("timestamp", StringType())
-    parsed_df = df.selectExpr("CAST(value AS STRING)").select(from_json(col("value"), schema).alias("data")).select("data.*")
+    print("STDOUT: Starting Spark Job...")
     
-    query = parsed_df.writeStream.format("org.elasticsearch.spark.sql").option("es.nodes", ES_NODES).option("es.port", ES_PORT).option("es.resource", ES_INDEX).option("checkpointLocation", "/tmp/spark-checkpoint").start()
-    query.awaitTermination()
+    try:
+        spark = SparkSession.builder \
+            .appName("KafkaToES") \
+            .getOrCreate()
+        
+        spark.sparkContext.setLogLevel("ERROR")
+        
+        KAFKA_BOOTSTRAP_SERVERS = "kafka:9092"
+        KAFKA_TOPIC = "user_logs"
+        ES_NODES = "elasticsearch"
+        ES_PORT = "9200"
+        ES_INDEX = "processed_logs"
+
+        print(f"STDOUT: Connecting to Kafka: {KAFKA_BOOTSTRAP_SERVERS}")
+
+        df = spark.readStream.format("kafka") \
+            .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS) \
+            .option("subscribe", KAFKA_TOPIC) \
+            .option("startingOffsets", "earliest") \
+            .load()
+
+        schema = StructType().add("user_id", StringType()).add("action", StringType()).add("timestamp", StringType())
+        
+        parsed_df = df.selectExpr("CAST(value AS STRING)") \
+            .select(from_json(col("value"), schema).alias("data")) \
+            .select("data.*")
+
+        print("STDOUT: Starting Write Stream to Elasticsearch...")
+
+        query = parsed_df.writeStream \
+            .format("org.elasticsearch.spark.sql") \
+            .option("es.nodes", ES_NODES) \
+            .option("es.port", ES_PORT) \
+            .option("es.resource", ES_INDEX) \
+            .option("es.nodes.wan.only", "true") \
+            .option("checkpointLocation", "/tmp/spark-checkpoint") \
+            .start()
+
+        query.awaitTermination()
+    except Exception as e:
+        print(f"ERROR: Job failed with: {e}", file=sys.stderr)
+        sys.exit(1)
